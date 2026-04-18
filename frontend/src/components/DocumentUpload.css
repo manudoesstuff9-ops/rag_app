@@ -46,6 +46,13 @@
 	border-color: var(--terracotta-light);
 }
 
+.file-meta {
+	margin-top: -0.75rem;
+	margin-bottom: 1rem;
+	font-size: 0.85rem;
+	color: var(--navy-light);
+}
+
 .upload-btn {
 	width: 100%;
 	padding: 1rem;

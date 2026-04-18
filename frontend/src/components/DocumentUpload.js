@@ -3,14 +3,21 @@ import apiClient from '../api/client';
 import './DocumentUpload.css';
 
 function DocumentUpload() {
-  const [filename, setFilename] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  const handleFileChange = (event) => {
+    const file = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+    setSelectedFile(file);
+    setError('');
+    setMessage('');
+  };
+
   const handleUpload = async () => {
-    if (!filename.trim()) {
-      setError('Please enter a filename');
+    if (!selectedFile) {
+      setError('Please choose a file to upload');
       return;
     }
 
@@ -19,15 +26,23 @@ function DocumentUpload() {
     setMessage('');
 
     try {
-      await apiClient.post('/api/documents', {
-        filename: filename,
-        content_type: 'text/plain',
-        file_size: 0
+      const fileText = await selectedFile.text();
+
+      if (!fileText.trim()) {
+        setError('Selected file is empty. Please upload a file with text content.');
+        setLoading(false);
+        return;
+      }
+
+      await apiClient.post('/api/rag/documents', {
+        filename: selectedFile.name,
+        text: fileText,
       });
-      setMessage('✓ Document added successfully!');
-      setFilename('');
+
+      setMessage(`✓ Uploaded ${selectedFile.name} successfully!`);
+      setSelectedFile(null);
     } catch (err) {
-      setError('Error adding document: ' + (err.response?.data?.message || err.message));
+      setError('Error uploading file: ' + (err.response?.data?.message || err.message));
     } finally {
       setLoading(false);
     }
@@ -36,25 +51,30 @@ function DocumentUpload() {
   return (
     <div className="document-upload">
       <h2>📄 Add Documents</h2>
-      <p className="subtitle">Add documents for the RAG system</p>
+      <p className="subtitle">Upload a real file so RAG can use its text content</p>
 
       <div className="upload-area">
         <input
-          type="text"
-          value={filename}
-          onChange={(e) => setFilename(e.target.value)}
-          placeholder="Enter document filename"
+          type="file"
+          onChange={handleFileChange}
           disabled={loading}
           className="filename-input"
+          accept=".txt,.md,.json,.csv,.log,.text"
         />
       </div>
 
+      {selectedFile && (
+        <p className="file-meta">
+          Selected: {selectedFile.name} ({Math.ceil(selectedFile.size / 1024)} KB)
+        </p>
+      )}
+
       <button
         onClick={handleUpload}
-        disabled={loading || !filename}
+        disabled={loading || !selectedFile}
         className="upload-btn"
       >
-        {loading ? 'Adding...' : 'Add Document'}
+        {loading ? 'Uploading...' : 'Upload File'}
       </button>
 
       {message && <div className="success-message">{message}</div>}

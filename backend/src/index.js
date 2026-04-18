@@ -3,7 +3,7 @@ const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 
 const { corsMiddleware } = require('./middleware/cors');
-const { errorHandler } = require('./middleware/errorHandler');
+const { errorHandler } = require('./middleware/errorhandler');
 
 const healthRoutes = require('./routes/health');
 const documentsRoutes = require('./routes/documents');

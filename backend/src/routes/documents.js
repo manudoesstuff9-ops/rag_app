@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const pool = require('../config/database');
-const { AppError } = require('../middleware/errorHandler');
+const { AppError } = require('../middleware/errorhandler');
 
 // Get all documents
 router.get('/', async (req, res, next) => {

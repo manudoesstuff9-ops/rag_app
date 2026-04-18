@@ -7,6 +7,7 @@ import RAGQuery from './components/RAGQuery';
 function App() {
   const [healthStatus, setHealthStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeView, setActiveView] = useState('upload');
 
   useEffect(() => {
     checkHealth();
@@ -29,6 +30,20 @@ function App() {
       <header className="header">
         <h1>RAG APP</h1>
         <p>Retrieval Augmented Generation System</p>
+        <div className="view-switcher">
+          <button
+            className={`view-btn ${activeView === 'upload' ? 'active' : ''}`}
+            onClick={() => setActiveView('upload')}
+          >
+            Upload Documents
+          </button>
+          <button
+            className={`view-btn ${activeView === 'query' ? 'active' : ''}`}
+            onClick={() => setActiveView('query')}
+          >
+            Query RAG
+          </button>
+        </div>
       </header>
 
       {loading ? (
@@ -41,13 +56,21 @@ function App() {
         <div className="status-badge">✓ Backend connected</div>
       )}
 
-      <main className="main">
+      <main className="main main-single">
         <section className="section">
-          <DocumentUpload />
-        </section>
-
-        <section className="section">
-          <RAGQuery />
+          {activeView === 'upload' ? (
+            <DocumentUpload />
+          ) : (
+            <>
+              <button
+                className="jump-upload-btn"
+                onClick={() => setActiveView('upload')}
+              >
+                Go to Upload Documents
+              </button>
+              <RAGQuery />
+            </>
+          )}
         </section>
       </main>
 

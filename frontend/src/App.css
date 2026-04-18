@@ -76,6 +76,34 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-secondary);
 }
 
+.view-switcher {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.view-btn {
+  border: 1px solid var(--accent);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.view-btn:hover {
+  transform: translateY(-1px);
+}
+
+.view-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* Status */
 .status-badge {
   background: var(--highlight);
@@ -107,6 +135,11 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+}
+
+.main-single {
+  grid-template-columns: 1fr;
+  max-width: 900px;
 }
 
 /* Sections */
@@ -190,6 +223,10 @@ h1, h2, h3, h4, h5, h6 {
   cursor: not-allowed;
   opacity: 0.85;
   box-shadow: none;
+}
+
+.jump-upload-btn {
+  margin-bottom: 1rem;
 }
 
 /* Footer */
