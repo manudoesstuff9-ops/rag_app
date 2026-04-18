@@ -193,10 +193,9 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--accent);
 }
 
-/* 🔥 BUTTON FIX (KEY PART) */
 .section button {
-  width: 100%;
-  padding: 0.75rem;
+  width: 80%;
+  padding: 0.60rem;
   border-radius: var(--radius-md);
   font-weight: 600;
 
@@ -208,14 +207,12 @@ h1, h2, h3, h4, h5, h6 {
   transition: all 0.2s ease;
 }
 
-/* hover ONLY when enabled */
 .section button:hover:not(:disabled) {
   background: var(--accent-dark);
   box-shadow: 0 6px 16px rgba(224, 122, 95, 0.5);
   transform: translateY(-1px);
 }
 
-/* disabled state */
 .section button:disabled {
   background: var(--bg-secondary) !important;
   color: var(--text-secondary) !important;
@@ -229,7 +226,6 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 1rem;
 }
 
-/* Footer */
 .footer {
   background: var(--text-primary);
   color: var(--bg-main);
@@ -239,7 +235,6 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.9rem;
 }
 
-/* Responsive */
 @media (max-width: 1024px) {
   .main {
     grid-template-columns: 1fr;
