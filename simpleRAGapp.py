@@ -1,8 +1,3 @@
-"""Converted script version of simpleRAGapp.ipynb.
-
-This file replaces notebook-only execution with a runnable Python script.
-"""
-
 import argparse
 from typing import Dict, List
 
