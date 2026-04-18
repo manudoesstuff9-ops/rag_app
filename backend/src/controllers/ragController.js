@@ -3,11 +3,67 @@ const { spawnSync } = require('child_process');
 const pool = require('../config/database');
 const { AppError } = require('../middleware/errorhandler');
 const PYTHON_COMMAND = process.env.PYTHON_COMMAND || 'python';
-const retrieveTopChunks = (query, k) => {
-  return pool.query(
-    'SELECT id, document_id, content FROM document_chunks WHERE content ILIKE $1 ORDER BY id DESC LIMIT $2',
-    [`%${query}%`, k]
-  );
+const CHUNK_SIZE = 900;
+const CHUNK_OVERLAP = 180;
+
+const extractKeywords = (query) => {
+  const stopwords = new Set(['the', 'is', 'are', 'a', 'an', 'to', 'of', 'in', 'on', 'for', 'and', 'or', 'what', 'who', 'when', 'where', 'why', 'how', 'tell', 'about', 'me']);
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .map(word => word.replace(/[?!.,;:]/g, ''))
+    .filter(word => word.length > 1)
+    .filter(word => !stopwords.has(word));
+};
+
+const splitIntoChunks = (text) => {
+  if (!text || !text.trim()) {
+    return [];
+  }
+
+  const chunks = [];
+  let start = 0;
+  const step = Math.max(1, CHUNK_SIZE - CHUNK_OVERLAP);
+
+  while (start < text.length) {
+    const end = Math.min(start + CHUNK_SIZE, text.length);
+    const chunk = text.slice(start, end).trim();
+    if (chunk) {
+      chunks.push(chunk);
+    }
+    if (end === text.length) {
+      break;
+    }
+    start += step;
+  }
+
+  return chunks;
+};
+
+const retrieveTopChunks = async (query, k) => {
+  const keywords = extractKeywords(query);
+  
+  if (keywords.length === 0) {
+    return pool.query(
+      'SELECT id, document_id, content FROM document_chunks ORDER BY id DESC LIMIT $1',
+      [k]
+    );
+  }
+
+  const whereConditions = keywords.map((_, i) => `content ILIKE $${i + 1}`).join(' OR ');
+  const scoreExpression = keywords
+    .map((_, i) => `(CASE WHEN content ILIKE $${i + 1} THEN 1 ELSE 0 END)`)
+    .join(' + ');
+  const sql = `
+    SELECT id, document_id, content, (${scoreExpression}) AS relevance_score
+    FROM document_chunks
+    WHERE ${whereConditions}
+    ORDER BY relevance_score DESC, id DESC
+    LIMIT $${keywords.length + 1}
+  `;
+  const values = [...keywords.map((kw) => `%${kw}%`), Math.max(k * 6, 12)];
+  
+  return pool.query(sql, values);
 };
 const buildFallbackAnswer = (query, rows) => {
   if (!rows.length) {
@@ -22,7 +78,7 @@ const runPythonRag = (query, rows, k) => {
   const payload = {
     query,
     k,
-    chunks: rows.map((row) => row.content),
+    chunks: rows.map((row) => row.content).filter(Boolean),
   };
 
   const processResult = spawnSync(
@@ -72,7 +128,7 @@ const queryRag = async (req, res, next) => {
       [
         query,
         answer,
-        result.rows.map((row) => String(row.document_id || row.id)),
+        Array.from(new Set(result.rows.map((row) => String(row.document_id || row.id)))),
       ]
     );
     res.status(200).json({
@@ -82,7 +138,7 @@ const queryRag = async (req, res, next) => {
         query,
         count: result.rows.length,
         used_python: usedPython,
-        results: result.rows,
+        results: result.rows.slice(0, topK),
         retrieved_chunks: pythonResult ? pythonResult.retrieved_chunks : [],
       },
     });
@@ -134,19 +190,29 @@ const addRagDocument = async (req, res, next) => {
     const { text, filename } = req.body;
     const safeFilename = filename || `doc-${Date.now()}.txt`;
     const content = text || safeFilename;
+    const chunks = splitIntoChunks(content);
+    const chunksToInsert = chunks.length ? chunks : [content];
     const insertedDocument = await pool.query(
       'INSERT INTO documents (filename, content_type, file_size) VALUES ($1, $2, $3) RETURNING id, filename',
       [safeFilename, 'text/plain', content.length]
     );
 
+    const values = [];
+    const placeholders = chunksToInsert.map((chunk, index) => {
+      const base = index * 3;
+      values.push(insertedDocument.rows[0].id, index + 1, chunk);
+      return `($${base + 1}, $${base + 2}, $${base + 3})`;
+    });
+
     await pool.query(
-      'INSERT INTO document_chunks (document_id, chunk_number, content) VALUES ($1, $2, $3)',
-      [insertedDocument.rows[0].id, 1, content]
+      `INSERT INTO document_chunks (document_id, chunk_number, content) VALUES ${placeholders.join(', ')}`,
+      values
     );
     res.status(201).json({
       success: true,
       message: 'Document added to RAG system',
       documents_count: 1,
+      chunks_count: chunksToInsert.length,
     });
   } catch (error) {
     console.error('RAG Add Document Error:', error.message);
