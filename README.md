@@ -4,6 +4,8 @@
 A full-stack Retrieval Augmented Generation (RAG) application with React frontend, Node.js backend, and PostgreSQL database.
 
 ```
+docker-compose up --build
+
 # Access the application
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:5000
