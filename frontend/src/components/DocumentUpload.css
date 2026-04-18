@@ -1,0 +1,114 @@
+.document-upload {
+  width: 100%;
+	position: relative;
+	z-index: 1;
+}
+
+.subtitle {
+	color: var(--navy-light);
+	margin-bottom: 2rem;
+	font-size: 0.95rem;
+	font-weight: 500;
+	line-height: 1.6;
+}
+
+.upload-area {
+	position: relative;
+	margin-bottom: 2rem;
+}
+
+.filename-input {
+	width: 100%;
+	padding: 0.95rem 1.15rem;
+	border: 2px solid var(--cream-dark);
+	border-radius: var(--radius-md);
+	background: var(--cream);
+	font-size: 0.95rem;
+	font-family: var(--font-body);
+	font-weight: 500;
+	color: var(--navy);
+	transition: all 0.35s var(--ease-out);
+}
+
+.filename-input::placeholder {
+	color: var(--navy-light);
+	opacity: 0.6;
+}
+
+.filename-input:focus {
+	outline: none;
+	border-color: var(--terracotta);
+	background: #fff;
+	box-shadow: 0 0 0 4px rgba(224, 122, 95, 0.12);
+}
+
+.filename-input:hover:not(:focus) {
+	border-color: var(--terracotta-light);
+}
+
+.upload-btn {
+	width: 100%;
+	padding: 1rem;
+	background: linear-gradient(135deg, var(--terracotta) 0%, var(--terracotta-dark) 100%);
+	color: #fff;
+	border: none;
+	border-radius: var(--radius-md);
+	font-family: var(--font-body);
+	font-size: 0.95rem;
+	font-weight: 700;
+	cursor: pointer;
+	transition: all 0.35s var(--ease-out);
+	box-shadow: 0 4px 15px rgba(224, 122, 95, 0.3);
+	letter-spacing: 0.5px;
+	text-transform: uppercase;
+}
+
+.upload-btn:hover:not(:disabled) {
+	transform: translateY(-2px);
+	box-shadow: 0 6px 25px rgba(224, 122, 95, 0.4);
+}
+
+.upload-btn:active:not(:disabled) {
+	transform: translateY(0);
+}
+
+.upload-btn:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+	transform: none;
+}
+
+.success-message {
+	padding: 1.15rem 1.25rem;
+	background: linear-gradient(135deg, #d4f3e9 0%, #c5ebe0 100%);
+	color: var(--sage-dark);
+	border-radius: var(--radius-md);
+	margin-top: 1.5rem;
+	border-left: 4px solid var(--sage);
+	font-weight: 600;
+	animation: slideInUp 0.4s var(--ease-out);
+	box-shadow: 0 2px 12px rgba(129, 178, 154, 0.2);
+}
+
+.error-message {
+	padding: 1.15rem 1.25rem;
+	background: linear-gradient(135deg, #fdd7d7 0%, #f8c8c8 100%);
+	color: #b5202e;
+	border-radius: var(--radius-md);
+	margin-top: 1.5rem;
+	border-left: 4px solid #d41f3d;
+	font-weight: 600;
+	animation: slideInUp 0.4s var(--ease-out);
+	box-shadow: 0 2px 12px rgba(212, 31, 61, 0.2);
+}
+
+@keyframes slideInUp {
+	from {
+		opacity: 0;
+		transform: translateY(15px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}

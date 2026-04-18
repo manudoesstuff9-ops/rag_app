@@ -2,17 +2,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
 COPY backend/package*.json ./
 
-# Install dependencies
 RUN npm install
 
-# Copy full source
 COPY backend/src ./src
 
-# Expose port
 EXPOSE 5000
 
-# Start app
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:5000/api/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+
 CMD ["npm", "start"]

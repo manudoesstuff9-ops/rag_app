@@ -1,10 +1,8 @@
 const express = require('express');
-const axios = require('axios');
 const { AppError } = require('../middleware/errorHandler');
+const pool = require('../config/database');
 
 const router = express.Router();
-
-const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || 'http://localhost:5001';
 
 router.post('/query', async (req, res, next) => {
   try {
@@ -14,14 +12,19 @@ router.post('/query', async (req, res, next) => {
       return next(new AppError(400, 'Query is required'));
     }
 
-    const response = await axios.post(`${RAG_SERVICE_URL}/api/rag/query`, {
-      query,
-      k: k || 3,
-    });
+    // Simple RAG implementation - search for relevant documents
+    const result = await pool.query(
+      'SELECT * FROM document_chunks WHERE content ILIKE $1 LIMIT $2',
+      [`%${query}%`, k || 3]
+    );
 
     res.status(200).json({
       success: true,
-      data: response.data.data,
+      data: {
+        query: query,
+        results: result.rows,
+        count: result.rows.length
+      },
     });
   } catch (error) {
     console.error('RAG Query Error:', error.message);

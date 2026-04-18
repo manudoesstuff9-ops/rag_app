@@ -1,0 +1,220 @@
+:root {
+  --bg-main: #F5E6C8;
+  --bg-secondary: #EAD7B0;
+  --bg-elevated: #FFF3D6;
+
+  --text-primary: #3B2F2F;
+  --text-secondary: #6B5E4A;
+
+  --accent: #E07A5F;
+  --accent-dark: #C4603F;
+
+  --highlight: #A8CFBA;
+  --border: #D8C3A5;
+
+  --font-heading: 'JetBrains Mono', monospace;
+  --font-body: 'JetBrains Mono', monospace;
+
+  --section-pad: clamp(1rem, 2vw, 3rem);
+  --gap: clamp(0.5rem, 2vw, 1.5rem);
+
+  --radius-md: 10px;
+  --radius-lg: 19px;
+
+  --shadow-card: 0 4px 24px rgba(60, 40, 20, 0.08);
+  --shadow-hover: 0 8px 40px rgba(60, 40, 20, 0.14);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Base */
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  background-color: var(--bg-main);
+  line-height: 1.7;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+/* App */
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-main);
+}
+
+/* Header */
+.header {
+  background: var(--bg-secondary);
+  padding: clamp(0.25rem, 1vw, 0.25rem) var(--section-pad);
+  text-align: center;
+  box-shadow: var(--shadow-card);
+  border-bottom: 2px solid var(--accent);
+}
+
+.header h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
+.header h1 em {
+  color: var(--accent);
+}
+
+.header p {
+  font-size: clamp(0.95rem, 2vw, 1.1rem);
+  color: var(--text-secondary);
+}
+
+/* Status */
+.status-badge {
+  background: var(--highlight);
+  color: var(--text-primary);
+  padding: 0.6rem 1.2rem;
+  border-radius: 50px;
+  display: inline-block;
+  margin: 1rem auto;
+  font-weight: 600;
+}
+
+/* Error */
+.error-banner {
+  background: #d41f3d;
+  color: #fff;
+  padding: 1rem;
+  margin: 1rem var(--section-pad);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+/* Layout */
+.main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+  padding: var(--section-pad);
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Sections */
+.section {
+  background: var(--bg-elevated);
+  padding: 2rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border);
+  transition: all 0.3s var(--ease-out);
+}
+
+.section:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-3px);
+}
+
+.section h2 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin-bottom: 1.2rem;
+  font-weight: 700;
+}
+
+.section h2::after {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 3px;
+  background: var(--accent);
+  margin-top: 6px;
+  border-radius: 2px;
+}
+
+/* Inputs */
+.section input,
+.section textarea {
+  width: 100%;
+  padding: 0.7rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  font-family: var(--font-body);
+}
+
+.section input:focus,
+.section textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* 🔥 BUTTON FIX (KEY PART) */
+.section button {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent-dark);
+
+  box-shadow: 0 3px 10px rgba(224, 122, 95, 0.4);
+  transition: all 0.2s ease;
+}
+
+/* hover ONLY when enabled */
+.section button:hover:not(:disabled) {
+  background: var(--accent-dark);
+  box-shadow: 0 6px 16px rgba(224, 122, 95, 0.5);
+  transform: translateY(-1px);
+}
+
+/* disabled state */
+.section button:disabled {
+  background: var(--bg-secondary) !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--border) !important;
+  cursor: not-allowed;
+  opacity: 0.85;
+  box-shadow: none;
+}
+
+/* Footer */
+.footer {
+  background: var(--text-primary);
+  color: var(--bg-main);
+  text-align: center;
+  padding: 0.75rem;
+  margin-top: auto;
+  font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .main {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .section {
+    padding: 1.5rem;
+  }
+
+  .header h1 {
+    font-size: 1.8rem;
+  }
+}
