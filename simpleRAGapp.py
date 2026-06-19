@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import List, Tuple
 
 import faiss
-import numpy as np
 import torch
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
@@ -23,7 +22,11 @@ def load_and_chunk_text(
     chunk_size: int = 500,
     chunk_overlap: int = 100,
 ) -> List[str]:
-    text = Path(file_path).read_text(encoding="utf-8")
+    path = Path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Missing file: {file_path}")
+
+    text = path.read_text(encoding="utf-8")
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
@@ -47,7 +50,6 @@ def build_faiss_index(
         show_progress_bar=True,
     ).astype("float32")
 
-    # Use cosine similarity via normalized inner product
     faiss.normalize_L2(embeddings)
 
     dimension = embeddings.shape[1]
@@ -106,7 +108,6 @@ def load_llm() -> Tuple[AutoTokenizer, AutoModelForCausalLM, torch.device]:
 
     tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_NAME)
 
-    # Some causal LMs do not define a pad token by default
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -135,18 +136,25 @@ def generate_answer(
         f"[{i+1}] {item['text']}" for i, item in enumerate(retrieved_chunks)
     )
 
-    prompt = f"""You are a helpful assistant.
-Use only the context below to answer the question.
-If the answer is not present in the context, say you do not know.
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a helpful assistant. Use only the provided context to answer. "
+                "If the answer is not in the context, say you do not know."
+            ),
+        },
+        {
+            "role": "user",
+            "content": f"Context:\n{context}\n\nQuestion:\n{query}",
+        },
+    ]
 
-Context:
-{context}
-
-Question:
-{query}
-
-Answer:
-"""
+    prompt = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+    )
 
     inputs = tokenizer(
         prompt,
@@ -160,40 +168,33 @@ Answer:
             **inputs,
             max_new_tokens=200,
             do_sample=False,
-            temperature=0.0,
             pad_token_id=tokenizer.eos_token_id,
         )
 
-    decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    # Decode only the newly generated tokens, not the prompt itself.
+    generated_tokens = outputs[0][inputs["input_ids"].shape[-1]:]
+    answer = tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
 
-    # Try to return only the answer portion
-    if "Answer:" in decoded:
-        return decoded.split("Answer:", 1)[-1].strip()
-
-    return decoded.strip()
+    return answer or "I do not know."
 
 
 def main() -> None:
-    # Build or load vector store
+    print("Loading embedding model...")
+    embed_model = SentenceTransformer(EMBED_MODEL_NAME)
+
     if Path(INDEX_FILE).exists() and Path(CHUNKS_FILE).exists():
         print("Loading saved FAISS index and chunks...")
         index, chunks = load_index_and_chunks()
     else:
         print("Building index from knowledge.txt...")
         chunks = load_and_chunk_text(KNOWLEDGE_FILE)
-        embed_model = SentenceTransformer(EMBED_MODEL_NAME)
         index = build_faiss_index(chunks, embed_model)
         save_index_and_chunks(index, chunks)
         print("Index saved.")
 
-    # Load embedding model for retrieval
-    embed_model = SentenceTransformer(EMBED_MODEL_NAME)
-
-    # Load local LLM
     print("Loading local model...")
     tokenizer, model, device = load_llm()
 
-    # Query loop
     while True:
         query = input("\nEnter query (or type 'exit'): ").strip()
         if query.lower() == "exit":
