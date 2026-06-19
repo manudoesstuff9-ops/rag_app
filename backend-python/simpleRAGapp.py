@@ -4,8 +4,8 @@ from typing import List, Tuple
 
 import faiss
 import torch
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -224,6 +224,41 @@ def main() -> None:
 
         print("\nAnswer:")
         print(answer)
+
+class RAGSystem:
+
+    def __init__(self):
+        print("Loading models...")
+
+        self.embed_model = SentenceTransformer(
+            EMBED_MODEL_NAME
+        )
+
+        self.index, self.chunks = load_index_and_chunks()
+
+        self.tokenizer, self.model, self.device = load_llm()
+
+    def query(self, question):
+
+        retrieved_chunks = retrieve(
+            query=question,
+            embed_model=self.embed_model,
+            index=self.index,
+            chunks=self.chunks,
+            k=3
+        )
+
+        return generate_answer(
+            query=question,
+            retrieved_chunks=retrieved_chunks,
+            tokenizer=self.tokenizer,
+            model=self.model,
+            device=self.device
+        )
+
+
+rag = RAGSystem()
+
 
 
 if __name__ == "__main__":
