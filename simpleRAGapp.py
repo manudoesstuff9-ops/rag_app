@@ -1,75 +1,228 @@
-import argparse
-from typing import Dict, List
+import pickle
+from pathlib import Path
+from typing import List, Tuple
+
+import faiss
+import numpy as np
+import torch
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from sentence_transformers import SentenceTransformer
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-def chunk_text(text: str, chunk_size: int, overlap: int) -> List[str]:
-    if overlap >= chunk_size:
-        raise ValueError("overlap must be smaller than chunk_size")
+KNOWLEDGE_FILE = "knowledge.txt"
+INDEX_FILE = "rag.index"
+CHUNKS_FILE = "chunks.pkl"
 
-    step = chunk_size - overlap
-    chunks = []
-    for i in range(0, len(text), step):
-        chunk = text[i : i + chunk_size]
-        if chunk:
-            chunks.append(chunk)
+EMBED_MODEL_NAME = "BAAI/bge-small-en-v1.5"
+LLM_MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
+
+
+def load_and_chunk_text(
+    file_path: str,
+    chunk_size: int = 500,
+    chunk_overlap: int = 100,
+) -> List[str]:
+    text = Path(file_path).read_text(encoding="utf-8")
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
+
+    chunks = splitter.split_text(text)
+    if not chunks:
+        raise ValueError("No chunks were created. Check your input text file.")
+
     return chunks
 
 
-def simple_retrieve(query: str, chunks: List[str], k: int = 3) -> List[Dict[str, str]]:
-    query_terms = set(query.lower().split())
-    scored = []
+def build_faiss_index(
+    chunks: List[str],
+    embed_model: SentenceTransformer,
+) -> faiss.Index:
+    embeddings = embed_model.encode(
+        chunks,
+        convert_to_numpy=True,
+        show_progress_bar=True,
+    ).astype("float32")
 
-    for chunk in chunks:
-        terms = set(chunk.lower().split())
-        score = len(query_terms.intersection(terms))
-        scored.append((score, chunk))
+    # Use cosine similarity via normalized inner product
+    faiss.normalize_L2(embeddings)
 
-    scored.sort(key=lambda item: item[0], reverse=True)
-    return [
-        {"text": chunk, "score": str(score)}
-        for score, chunk in scored[:k]
-        if score > 0
-    ]
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatIP(dimension)
+    index.add(embeddings)
+
+    return index
 
 
-def generate_answer(query: str, retrieved_chunks: List[Dict[str, str]]) -> str:
+def save_index_and_chunks(index: faiss.Index, chunks: List[str]) -> None:
+    faiss.write_index(index, INDEX_FILE)
+    with open(CHUNKS_FILE, "wb") as f:
+        pickle.dump(chunks, f)
+
+
+def load_index_and_chunks() -> Tuple[faiss.Index, List[str]]:
+    index = faiss.read_index(INDEX_FILE)
+    with open(CHUNKS_FILE, "rb") as f:
+        chunks = pickle.load(f)
+    return index, chunks
+
+
+def retrieve(
+    query: str,
+    embed_model: SentenceTransformer,
+    index: faiss.Index,
+    chunks: List[str],
+    k: int = 3,
+) -> List[dict]:
+    query_embedding = embed_model.encode(
+        [query],
+        convert_to_numpy=True,
+    ).astype("float32")
+
+    faiss.normalize_L2(query_embedding)
+
+    scores, indices = index.search(query_embedding, k)
+
+    results = []
+    for idx, score in zip(indices[0], scores[0]):
+        if idx == -1:
+            continue
+        results.append(
+            {
+                "text": chunks[idx],
+                "score": float(score),
+            }
+        )
+
+    return results
+
+
+def load_llm() -> Tuple[AutoTokenizer, AutoModelForCausalLM, torch.device]:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dtype = torch.float16 if device.type == "cuda" else torch.float32
+
+    tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_NAME)
+
+    # Some causal LMs do not define a pad token by default
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    model = AutoModelForCausalLM.from_pretrained(
+        LLM_MODEL_NAME,
+        torch_dtype=dtype,
+        low_cpu_mem_usage=True,
+    )
+    model.to(device)
+    model.eval()
+
+    return tokenizer, model, device
+
+
+def generate_answer(
+    query: str,
+    retrieved_chunks: List[dict],
+    tokenizer: AutoTokenizer,
+    model: AutoModelForCausalLM,
+    device: torch.device,
+) -> str:
     if not retrieved_chunks:
         return f"No matching context found for: {query}"
 
-    context = " ".join(item["text"] for item in retrieved_chunks)
-    return f"Answer based on retrieved context: {context[:400]}"
+    context = "\n\n".join(
+        f"[{i+1}] {item['text']}" for i, item in enumerate(retrieved_chunks)
+    )
 
+    prompt = f"""You are a helpful assistant.
+Use only the context below to answer the question.
+If the answer is not present in the context, say you do not know.
 
-def rag_pipeline(query: str) -> Dict[str, object]:
-    documents = [
-        "RAG stands for Retrieval Augmented Generation.",
-        "FAISS is a library for efficient similarity search.",
-        "Embeddings convert text into vectors.",
-        "Chunking is the process of splitting text into smaller parts.",
-        "Large Language Models generate text based on input context.",
-    ]
+Context:
+{context}
 
-    chunks = []
-    for doc in documents:
-        chunks.extend(chunk_text(doc, chunk_size=100, overlap=25))
+Question:
+{query}
 
-    retrieved = simple_retrieve(query, chunks, k=3)
-    answer = generate_answer(query, retrieved)
+Answer:
+"""
 
-    return {
-        "query": query,
-        "retrieved_chunks": retrieved,
-        "answer": answer,
-    }
+    inputs = tokenizer(
+        prompt,
+        return_tensors="pt",
+        truncation=True,
+        max_length=2048,
+    ).to(device)
+
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=200,
+            do_sample=False,
+            temperature=0.0,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+
+    decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    # Try to return only the answer portion
+    if "Answer:" in decoded:
+        return decoded.split("Answer:", 1)[-1].strip()
+
+    return decoded.strip()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run simple RAG pipeline")
-    parser.add_argument("query", nargs="?", default="What is RAG?")
-    args = parser.parse_args()
+    # Build or load vector store
+    if Path(INDEX_FILE).exists() and Path(CHUNKS_FILE).exists():
+        print("Loading saved FAISS index and chunks...")
+        index, chunks = load_index_and_chunks()
+    else:
+        print("Building index from knowledge.txt...")
+        chunks = load_and_chunk_text(KNOWLEDGE_FILE)
+        embed_model = SentenceTransformer(EMBED_MODEL_NAME)
+        index = build_faiss_index(chunks, embed_model)
+        save_index_and_chunks(index, chunks)
+        print("Index saved.")
 
-    result = rag_pipeline(args.query)
-    print(result["answer"])
+    # Load embedding model for retrieval
+    embed_model = SentenceTransformer(EMBED_MODEL_NAME)
+
+    # Load local LLM
+    print("Loading local model...")
+    tokenizer, model, device = load_llm()
+
+    # Query loop
+    while True:
+        query = input("\nEnter query (or type 'exit'): ").strip()
+        if query.lower() == "exit":
+            break
+        if not query:
+            continue
+
+        retrieved_chunks = retrieve(
+            query=query,
+            embed_model=embed_model,
+            index=index,
+            chunks=chunks,
+            k=3,
+        )
+
+        print("\nRetrieved chunks:")
+        for item in retrieved_chunks:
+            print(f"- score={item['score']:.4f} | {item['text'][:200]}")
+
+        answer = generate_answer(
+            query=query,
+            retrieved_chunks=retrieved_chunks,
+            tokenizer=tokenizer,
+            model=model,
+            device=device,
+        )
+
+        print("\nAnswer:")
+        print(answer)
 
 
 if __name__ == "__main__":
